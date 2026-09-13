@@ -5,6 +5,17 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var clipboardManager: ClipboardManager
     let onSelect: (ClipboardItem) -> Void
+    @State private var searchText = ""
+
+    private var filteredItems: [ClipboardItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return clipboardManager.items }
+
+        return clipboardManager.items.filter { item in
+            guard case .text(let text) = item.content else { return false }
+            return text.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +26,26 @@ struct ContentView: View {
 
             Divider()
 
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+
+                TextField("Search clipboard", text: $searchText)
+                    .textFieldStyle(.plain)
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+
             if clipboardManager.items.isEmpty {
                 Spacer()
                 Text("No items yet")
@@ -23,13 +54,19 @@ struct ContentView: View {
             } else {
                 ScrollView {
                     // Vertical spacing here is the margin between entries.
-                    VStack(spacing: 8) {
-                        ForEach(clipboardManager.items) { item in
-                            row(for: item)
-                                .onTapGesture { onSelect(item) }
+                    if filteredItems.isEmpty {
+                        Text("No matching items")
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 24)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(filteredItems) { item in
+                                row(for: item)
+                                    .onTapGesture { onSelect(item) }
+                            }
                         }
+                        .padding(10)
                     }
-                    .padding(10)
                 }
             }
         }
