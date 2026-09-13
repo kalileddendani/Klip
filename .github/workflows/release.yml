@@ -30,7 +30,15 @@ jobs:
           else
             version="${latest_tag#v}"
             IFS='.' read -r major minor patch <<< "$version"
-            next_tag="v${major}.${minor}.$((patch + 1))"
+            commit_subject=$(git log -1 --pretty=%s "$GITHUB_SHA")
+            case "$commit_subject" in
+              feat:*)
+                next_tag="v${major}.$((minor + 1)).0"
+                ;;
+              *)
+                next_tag="v${major}.${minor}.$((patch + 1))"
+                ;;
+            esac
           fi
 
           git config user.name "github-actions[bot]"
