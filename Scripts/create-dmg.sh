@@ -9,6 +9,8 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 DMG_ROOT="$ROOT_DIR/.build/dmg-root"
 OUTPUT="$ROOT_DIR/dist/Klip.dmg"
+VERSION="${VERSION:-0.0.0}"
+VERSION="${VERSION#v}"
 
 cd "$ROOT_DIR"
 swift build -c release --product Klip
@@ -20,6 +22,9 @@ iconutil -c icns "$BUILD_DIR/Klip.iconset" -o "$RESOURCES_DIR/Klip.icns"
 cp "$BUILD_DIR/release/Klip" "$MACOS_DIR/Klip"
 cp "$ROOT_DIR/Sources/Klip/Info.plist" "$CONTENTS_DIR/Info.plist"
 cp "$ROOT_DIR/Sources/Klip/Klip.entitlements" "$CONTENTS_DIR/"
+
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS_DIR/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$CONTENTS_DIR/Info.plist"
 
 codesign --force --deep --sign - "$APP_DIR"
 

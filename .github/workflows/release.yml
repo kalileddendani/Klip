@@ -61,6 +61,8 @@ jobs:
 
       - name: Build installer disk image
         run: ./Scripts/create-dmg.sh
+        env:
+          VERSION: ${{ steps.release.outputs.tag }}
 
       - name: Attach installer to release
         uses: softprops/action-gh-release@v2
