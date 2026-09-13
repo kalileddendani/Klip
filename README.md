@@ -55,4 +55,13 @@ Download the latest **Klip.dmg** file from the
 5. Press **Command + Shift + V** to open your clipboard history.
 
 The current release is distributed as a DMG for a simple drag-and-drop
-installation. Because the app is currently not Apple-notarized.
+installation. Because the app is currently not Apple-notarized, macOS may
+show a security warning the first time you open Klip.
+
+If macOS shows the warning:
+
+1. Open `Klip.app` once and close the warning.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll down to the security section.
+4. Click **Open Anyway** next to the message about Klip.
+5. Confirm by clicking **Open**.
