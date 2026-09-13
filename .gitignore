@@ -1,0 +1,18 @@
+# macOS metadata
+.DS_Store
+
+# Swift Package Manager build output and local metadata
+.build/
+.swiftpm/
+dist/
+
+# Local Xcode/Swift build output
+DerivedData/
+
+# Local editor settings
+.vscode/
+
+# Temporary editor files
+*.swp
+*.swo
+*~
