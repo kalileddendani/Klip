@@ -39,6 +39,7 @@ final class PopupPanelController {
     private let clipboardManager: ClipboardManager
     private let size = NSSize(width: 320, height: 400)
     private var resignKeyObserver: NSObjectProtocol?
+    private var keyboardMonitor: Any?
 
     init(clipboardManager: ClipboardManager) {
         self.clipboardManager = clipboardManager
@@ -88,13 +89,42 @@ final class PopupPanelController {
 
     func show() {
         positionNearMouse()
+        installKeyboardMonitor()
         // makeKeyAndOrderFront on a non-activating panel does NOT bring our
         // app to the foreground, so the previously active app keeps focus.
         panel.makeKeyAndOrderFront(nil)
     }
 
     func hide() {
+        if let keyboardMonitor {
+            NSEvent.removeMonitor(keyboardMonitor)
+            self.keyboardMonitor = nil
+        }
         panel.orderOut(nil)
+    }
+
+    private func installKeyboardMonitor() {
+        guard keyboardMonitor == nil else { return }
+
+        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard self.panel.isVisible else { return event }
+
+            switch event.keyCode {
+            case 125:
+                NotificationCenter.default.post(
+                    name: .klipMoveSelection, object: nil, userInfo: ["direction": "down"])
+                return nil
+            case 126:
+                NotificationCenter.default.post(
+                    name: .klipMoveSelection, object: nil, userInfo: ["direction": "up"])
+                return nil
+            case 36, 76:
+                NotificationCenter.default.post(name: .klipConfirmSelection, object: nil)
+                return nil
+            default:
+                return event
+            }
+        }
     }
 
     private func positionNearMouse() {
