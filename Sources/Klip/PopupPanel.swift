@@ -55,6 +55,8 @@ final class PopupPanelController {
 
         let contentView = ContentView(clipboardManager: clipboardManager) { [weak self] item in
             self?.select(item)
+        } onQuit: {
+            NSApp.terminate(nil)
         }
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.frame = NSRect(origin: .zero, size: size)

@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var clipboardManager: ClipboardManager
     let onSelect: (ClipboardItem) -> Void
+    let onQuit: () -> Void
     @State private var searchText = ""
 
     private var filteredItems: [ClipboardItem] {
@@ -19,10 +20,22 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Clipboard History")
-                .font(.headline)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
+            HStack {
+                Text("Clipboard History")
+                    .font(.headline)
+
+                Spacer()
+
+                Button(action: onQuit) {
+                    Image(systemName: "power")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Quit Klip")
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+            .padding(.horizontal, 12)
 
             Divider()
 
