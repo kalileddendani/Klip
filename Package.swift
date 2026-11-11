@@ -14,6 +14,11 @@ let package = Package(
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("AppKit"),
             ]
+        ),
+        .testTarget(
+            name: "KlipTests",
+            dependencies: ["Klip"],
+            path: "Tests/KlipTests"
         )
     ]
 )

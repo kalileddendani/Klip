@@ -17,48 +17,61 @@ final class HotkeyManager {
         self.action = action
     }
 
-    func register() {
+    func register(_ shortcut: HotkeyChoice) -> OSStatus {
         Self.registry[hotKeyID] = self
 
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
+        if eventHandler == nil {
+            var eventType = EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyPressed)
+            )
 
-        InstallEventHandler(
-            GetApplicationEventTarget(),
-            { _, event, _ -> OSStatus in
-                var hkID = EventHotKeyID()
-                GetEventParameter(
-                    event,
-                    EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID),
-                    nil,
-                    MemoryLayout<EventHotKeyID>.size,
-                    nil,
-                    &hkID
-                )
-                HotkeyManager.registry[hkID.id]?.action()
-                return noErr
-            },
-            1,
-            &eventType,
-            nil,
-            &eventHandler
-        )
+            let status = InstallEventHandler(
+                GetApplicationEventTarget(),
+                { _, event, _ -> OSStatus in
+                    var hkID = EventHotKeyID()
+                    GetEventParameter(
+                        event,
+                        EventParamName(kEventParamDirectObject),
+                        EventParamType(typeEventHotKeyID),
+                        nil,
+                        MemoryLayout<EventHotKeyID>.size,
+                        nil,
+                        &hkID
+                    )
+                    HotkeyManager.registry[hkID.id]?.action()
+                    return noErr
+                },
+                1,
+                &eventType,
+                nil,
+                &eventHandler
+            )
+            guard status == noErr else {
+                Self.registry[hotKeyID] = nil
+                return status
+            }
+        }
 
         let keyCodeV: UInt32 = 9  // kVK_ANSI_V
-        let modifiers = UInt32(cmdKey | shiftKey)
         let carbonHotKeyID = EventHotKeyID(signature: OSType(0x4B4C_4950), id: hotKeyID)  // 'KLIP'
 
-        RegisterEventHotKey(
+        var newRef: EventHotKeyRef?
+        let status = RegisterEventHotKey(
             keyCodeV,
-            modifiers,
+            shortcut.modifiers,
             carbonHotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &newRef
         )
+        guard status == noErr else { return status }
+        guard let newRef else { return OSStatus(eventInternalErr) }
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        hotKeyRef = newRef
+        return noErr
     }
 
     func unregister() {

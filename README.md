@@ -21,7 +21,7 @@ need it.
 
 ## Features
 
-- Clipboard history for the last 20 copied items
+- Clipboard history for the last 20 copied items by default, plus pinned items
 - Supports copied text and images
 - Fast search through text history
 - Keyboard navigation with `Up`, `Down`, and `Enter`
@@ -30,6 +30,9 @@ need it.
 - Compact translucent popup positioned near the mouse cursor
 - One-click copy and paste from clipboard history
 - Duplicate consecutive clipboard entries are ignored
+- Pin or delete entries and optionally remove duplicates
+- Choose a shortcut, launch at login and recent history limit in settings
+- Optionally save clipboard history between launches
 - Close with `Escape` or by clicking outside the popup
 - Minimal clipboard-and-leaf icon
 - Built with Swift, SwiftUI, and AppKit
@@ -37,10 +40,12 @@ need it.
 
 ## Privacy
 
-Clipboard history is kept in memory and is cleared when Klip quits. Klip does
-not upload clipboard content to a server. Clipboard data can contain sensitive
-information, so do not copy passwords or private keys unless you understand
-the risks of keeping them in clipboard history.
+By default, clipboard history is kept in memory and cleared when Klip quits.
+In settings you can opt in to saving history between launches. Saved history
+is stored unencrypted on your Mac; turning the setting off deletes the saved
+file. Klip does not upload clipboard content to a server. Clipboard data can
+contain sensitive information, so do not copy passwords or private keys unless
+you understand the risks of keeping them in clipboard history.
 
 ## Installation
 

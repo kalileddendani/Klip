@@ -4,6 +4,7 @@ import SwiftUI
 /// A borderless, non-activating HUD-style panel that floats above the
 /// currently active app without stealing keyboard focus from it.
 final class PopupPanel: NSPanel {
+    var isShowingSettings = false
 
     init(contentRect: NSRect) {
         super.init(
@@ -32,7 +33,7 @@ final class PopupPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
-        guard event.type == .keyDown else {
+        guard event.type == .keyDown, !isShowingSettings else {
             super.sendEvent(event)
             return
         }
@@ -60,7 +61,12 @@ final class PopupPanelController {
     private let size = NSSize(width: 320, height: 400)
     private var resignKeyObserver: NSObjectProtocol?
 
-    init(clipboardManager: ClipboardManager) {
+    init(
+        clipboardManager: ClipboardManager,
+        settings: KlipSettings,
+        onChangeHotkey: @escaping (HotkeyChoice) -> Void,
+        onChangeLaunchAtLogin: @escaping (Bool) -> Void
+    ) {
         self.clipboardManager = clipboardManager
         panel = PopupPanel(contentRect: NSRect(origin: .zero, size: size))
 
@@ -73,7 +79,15 @@ final class PopupPanelController {
         visualEffect.layer?.masksToBounds = true
         visualEffect.autoresizingMask = [.width, .height]
 
-        let contentView = ContentView(clipboardManager: clipboardManager) { [weak self] item in
+        let contentView = ContentView(
+            clipboardManager: clipboardManager,
+            settings: settings,
+            onChangeHotkey: onChangeHotkey,
+            onChangeLaunchAtLogin: onChangeLaunchAtLogin,
+            onSettingsVisibilityChange: { [weak panel] showing in
+                panel?.isShowingSettings = showing
+            }
+        ) { [weak self] item in
             self?.select(item)
         } onQuit: {
             NSApp.terminate(nil)
