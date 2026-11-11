@@ -75,31 +75,40 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
             } else {
-                ScrollView {
-                    // Vertical spacing here is the margin between entries.
-                    if filteredItems.isEmpty {
-                        Text("No matching items")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 24)
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) {
-                                index, item in
-                                row(for: item)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(
-                                                index == selectedIndex
-                                                    ? Color.accentColor.opacity(0.22) : .clear)
-                                    )
-                                    .onTapGesture {
-                                        selectedIndex = index
-                                        onSelect(item)
-                                    }
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        // Vertical spacing here is the margin between entries.
+                        if filteredItems.isEmpty {
+                            Text("No matching items")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 24)
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(Array(filteredItems.enumerated()), id: \.element.id) {
+                                    index, item in
+                                    row(for: item)
+                                        .id(item.id)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(
+                                                    index == selectedIndex
+                                                        ? Color.accentColor.opacity(0.22) : .clear)
+                                        )
+                                        .onTapGesture {
+                                            selectedIndex = index
+                                            onSelect(item)
+                                        }
+                                }
                             }
+                            .padding(10)
                         }
-                        .padding(10)
                     }
+                    .onChange(of: selectedIndex, perform: { index in
+                        guard filteredItems.indices.contains(index) else { return }
+                        withAnimation(.easeInOut(duration: 0.12)) {
+                            proxy.scrollTo(filteredItems[index].id, anchor: .center)
+                        }
+                    })
                 }
             }
         }
