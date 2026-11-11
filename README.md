@@ -26,6 +26,7 @@ need it.
 - Fast search through text history
 - Keyboard navigation with `Up`, `Down`, and `Enter`
 - Global shortcut: `Command + Shift + V`
+- Starts automatically at login after the first launch
 - Automatic paste into the previously active application
 - Compact translucent popup positioned near the mouse cursor
 - One-click copy and paste from clipboard history
@@ -50,9 +51,11 @@ Download the latest **Klip.dmg** file from the
 1. Open `Klip.dmg`.
 2. Drag `Klip.app` to the `Applications` folder.
 3. Open Klip from `Applications`.
-4. Grant Accessibility permission under **System Settings → Privacy & Security
+4. Allow Klip to open at login if macOS asks. You can manage this under
+   **System Settings → General → Login Items**.
+5. Grant Accessibility permission under **System Settings → Privacy & Security
    → Accessibility** if you want automatic paste to work.
-5. Press **Command + Shift + V** to open your clipboard history.
+6. Press **Command + Shift + V** to open your clipboard history.
 
 The current release is distributed as a DMG for a simple drag-and-drop
 installation. Because the app is currently not Apple-notarized, macOS may

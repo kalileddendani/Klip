@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 /// Wires together the clipboard monitor, the floating popup panel and the
 /// global hotkey. Runs as a background "agent" app (no Dock icon, no menu bar).
@@ -12,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Belt-and-suspenders: even if Info.plist LSUIElement is missing,
         // this hides the Dock icon and menu bar at runtime.
         NSApp.setActivationPolicy(.accessory)
+
+        registerForLaunchAtLogin()
 
         clipboardManager = ClipboardManager()
         clipboardManager.startMonitoring()
@@ -28,6 +31,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    private func registerForLaunchAtLogin() {
+        guard SMAppService.mainApp.status == .notRegistered else { return }
+
+        do {
+            try SMAppService.mainApp.register()
+        } catch {
+            NSLog("Klip could not register to launch at login: %@", error.localizedDescription)
+        }
     }
 
     /// Accessibility permission is required to simulate the Cmd+V keystroke
