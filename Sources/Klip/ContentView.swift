@@ -10,10 +10,15 @@ extension Notification.Name {
 /// Compact list of clipboard history items shown inside the floating panel.
 struct ContentView: View {
     @ObservedObject var clipboardManager: ClipboardManager
+    @ObservedObject var settings: KlipSettings
+    let onChangeHotkey: (HotkeyChoice) -> Void
+    let onChangeLaunchAtLogin: (Bool) -> Void
+    let onSettingsVisibilityChange: (Bool) -> Void
     let onSelect: (ClipboardItem) -> Void
     let onQuit: () -> Void
     @State private var searchText = ""
     @State private var selectedIndex = 0
+    @State private var showingSettings = false
     @FocusState private var searchIsFocused: Bool
 
     private var filteredItems: [ClipboardItem] {
@@ -29,10 +34,19 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Clipboard History")
+                Text(showingSettings ? "Settings" : "Clipboard History")
                     .font(.headline)
 
                 Spacer()
+
+                Button {
+                    showingSettings.toggle()
+                } label: {
+                    Image(systemName: showingSettings ? "chevron.left" : "gearshape")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(showingSettings ? "Back to history" : "Settings")
 
                 Button(action: onQuit) {
                     Image(systemName: "power")
@@ -47,6 +61,61 @@ struct ContentView: View {
 
             Divider()
 
+            if let error = clipboardManager.errorMessage {
+                HStack {
+                    Text(error).font(.caption)
+                    Spacer()
+                    Button("Dismiss") { clipboardManager.errorMessage = nil }
+                        .buttonStyle(.plain)
+                }
+                .foregroundStyle(.orange)
+                .padding(8)
+            }
+
+            if showingSettings {
+                settingsView
+            } else {
+                historyView
+            }
+        }
+        .frame(width: 320, height: 400)
+        .background(Color.clear)
+        .onAppear {
+            searchIsFocused = true
+            selectedIndex = 0
+        }
+        .onChange(of: showingSettings) { showing in
+            onSettingsVisibilityChange(showing)
+            if !showing { searchIsFocused = true }
+        }
+        .onChange(
+            of: searchText,
+            perform: { _ in
+                selectedIndex = 0
+            }
+        )
+        .onChange(of: clipboardManager.items) { _ in
+            selectedIndex = max(0, min(selectedIndex, filteredItems.count - 1))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .klipMoveSelection)) { notification in
+            guard !showingSettings, !filteredItems.isEmpty,
+                let direction = notification.userInfo?["direction"] as? String
+            else { return }
+
+            if direction == "down" {
+                selectedIndex = min(selectedIndex + 1, filteredItems.count - 1)
+            } else {
+                selectedIndex = max(selectedIndex - 1, 0)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .klipConfirmSelection)) { _ in
+            guard !showingSettings else { return }
+            selectCurrentItem()
+        }
+    }
+
+    private var historyView: some View {
+        VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -86,18 +155,35 @@ struct ContentView: View {
                             VStack(spacing: 8) {
                                 ForEach(Array(filteredItems.enumerated()), id: \.element.id) {
                                     index, item in
-                                    row(for: item)
-                                        .id(item.id)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(
-                                                    index == selectedIndex
-                                                        ? Color.accentColor.opacity(0.22) : .clear)
-                                        )
-                                        .onTapGesture {
-                                            selectedIndex = index
-                                            onSelect(item)
+                                    HStack(spacing: 4) {
+                                        row(for: item)
+                                            .onTapGesture {
+                                                selectedIndex = index
+                                                onSelect(item)
+                                            }
+                                        Button {
+                                            clipboardManager.togglePin(item)
+                                        } label: {
+                                            Image(systemName: item.isPinned ? "pin.fill" : "pin")
                                         }
+                                        .foregroundStyle(.secondary)
+                                        .help(item.isPinned ? "Unpin" : "Pin")
+                                        Button {
+                                            clipboardManager.delete(item)
+                                        } label: {
+                                            Image(systemName: "trash")
+                                        }
+                                        .foregroundStyle(.secondary)
+                                        .help("Delete")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .id(item.id)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(
+                                                index == selectedIndex
+                                                    ? Color.accentColor.opacity(0.22) : .clear)
+                                    )
                                 }
                             }
                             .padding(10)
@@ -112,31 +198,47 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(width: 320, height: 400)
-        .background(Color.clear)
-        .onAppear {
-            searchIsFocused = true
-            selectedIndex = 0
-        }
-        .onChange(
-            of: searchText,
-            perform: { _ in
-                selectedIndex = 0
-            }
-        )
-        .onReceive(NotificationCenter.default.publisher(for: .klipMoveSelection)) { notification in
-            guard !filteredItems.isEmpty,
-                let direction = notification.userInfo?["direction"] as? String
-            else { return }
+    }
 
-            if direction == "down" {
-                selectedIndex = min(selectedIndex + 1, filteredItems.count - 1)
-            } else {
-                selectedIndex = max(selectedIndex - 1, 0)
+    private var settingsView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Toggle("Launch at login", isOn: Binding(
+                    get: { settings.launchAtLogin },
+                    set: onChangeLaunchAtLogin
+                ))
+                Text("macOS may require approval in Login Items.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Shortcut", selection: Binding(
+                    get: { settings.hotkey },
+                    set: onChangeHotkey
+                )) {
+                    ForEach(HotkeyChoice.allCases) { shortcut in
+                        Text(shortcut.title).tag(shortcut)
+                    }
+                }
+                Stepper(
+                    "Recent items: \(settings.historyLimit)",
+                    value: $settings.historyLimit, in: 5...200, step: 5
+                )
+                .onChange(of: settings.historyLimit) { _ in clipboardManager.applyHistoryLimit() }
+                Text("Pinned items do not count toward this limit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Remove duplicate entries", isOn: $settings.deduplicate)
+                    .onChange(of: settings.deduplicate) { enabled in
+                        if enabled { clipboardManager.removeDuplicates() }
+                    }
+                Toggle("Save history between launches", isOn: Binding(
+                    get: { settings.persistHistory },
+                    set: { clipboardManager.setPersistence($0) }
+                ))
+                Text("Saved history is stored unencrypted on this Mac. Turning this off deletes the saved file.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .klipConfirmSelection)) { _ in
-            selectCurrentItem()
+            .padding(12)
         }
     }
 

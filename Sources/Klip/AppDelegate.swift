@@ -8,23 +8,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardManager: ClipboardManager!
     private var popupController: PopupPanelController!
     private var hotkeyManager: HotkeyManager!
+    private let settings = KlipSettings()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Belt-and-suspenders: even if Info.plist LSUIElement is missing,
         // this hides the Dock icon and menu bar at runtime.
         NSApp.setActivationPolicy(.accessory)
 
-        registerForLaunchAtLogin()
-
-        clipboardManager = ClipboardManager()
+        clipboardManager = ClipboardManager(settings: settings)
         clipboardManager.startMonitoring()
 
-        popupController = PopupPanelController(clipboardManager: clipboardManager)
+        if settings.launchAtLogin {
+            registerForLaunchAtLogin()
+        }
+
+        popupController = PopupPanelController(
+            clipboardManager: clipboardManager,
+            settings: settings,
+            onChangeHotkey: { [weak self] shortcut in self?.changeHotkey(shortcut) },
+            onChangeLaunchAtLogin: { [weak self] enabled in self?.changeLaunchAtLogin(enabled) }
+        )
 
         hotkeyManager = HotkeyManager { [weak self] in
             self?.popupController.toggle()
         }
-        hotkeyManager.register()
+        let status = hotkeyManager.register(settings.hotkey)
+        if status != noErr {
+            clipboardManager.errorMessage = "Could not register shortcut \(settings.hotkey.title) (error \(status))."
+            popupController.show()
+        }
 
         requestAccessibilityPermissionIfNeeded()
     }
@@ -39,7 +51,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try SMAppService.mainApp.register()
         } catch {
-            NSLog("Klip could not register to launch at login: %@", error.localizedDescription)
+            clipboardManager.errorMessage = "Could not enable launch at login: \(error.localizedDescription)"
+        }
+    }
+
+    private func changeHotkey(_ shortcut: HotkeyChoice) {
+        guard shortcut != settings.hotkey else { return }
+        let status = hotkeyManager.register(shortcut)
+        guard status == noErr else {
+            clipboardManager.errorMessage = "Could not register shortcut \(shortcut.title) (error \(status))."
+            return
+        }
+        settings.hotkey = shortcut
+    }
+
+    private func changeLaunchAtLogin(_ enabled: Bool) {
+        do {
+            let service = SMAppService.mainApp
+            if enabled && service.status == .notRegistered {
+                try service.register()
+            } else if !enabled && service.status != .notRegistered {
+                try service.unregister()
+            }
+            settings.launchAtLogin = enabled
+            if enabled && service.status == .requiresApproval {
+                clipboardManager.errorMessage = "Allow Klip in System Settings > General > Login Items."
+            }
+        } catch {
+            clipboardManager.errorMessage = "Could not change launch at login: \(error.localizedDescription)"
         }
     }
 

@@ -7,10 +7,37 @@ final class ClipboardManager: ObservableObject {
 
     @Published private(set) var items: [ClipboardItem] = []
 
-    private let maxItems = 20
+    private let settings: KlipSettings
+    private let store: HistoryStore?
     private let pollInterval: TimeInterval = 0.5
     private var lastChangeCount = NSPasteboard.general.changeCount
     private var timer: Timer?
+    private var historyLoadFailed = false
+    @Published var errorMessage: String?
+
+    init(settings: KlipSettings, store: HistoryStore? = nil) {
+        self.settings = settings
+        if let store {
+            self.store = store
+        } else {
+            do {
+                self.store = try HistoryStore.applicationStore()
+            } catch {
+                self.store = nil
+                errorMessage = "Could not locate history storage: \(error.localizedDescription)"
+            }
+        }
+        if settings.persistHistory {
+            do {
+                guard let store = self.store else { return }
+                items = try store.load()
+                trimHistory()
+            } catch {
+                historyLoadFailed = true
+                errorMessage = "Could not load clipboard history: \(error.localizedDescription)"
+            }
+        }
+    }
 
     func startMonitoring() {
         let timer = Timer(timeInterval: pollInterval, repeats: true) { [weak self] _ in
@@ -51,13 +78,91 @@ final class ClipboardManager: ObservableObject {
         return png
     }
 
-    private func insert(_ content: ClipboardContent) {
+    func insert(_ content: ClipboardContent) {
         // Ignore duplicate consecutive entries.
-        if items.first?.content == content { return }
+        if items.first(where: { !$0.isPinned })?.content == content { return }
 
-        items.insert(ClipboardItem(content: content, date: Date()), at: 0)
-        if items.count > maxItems {
-            items.removeLast(items.count - maxItems)
+        if settings.deduplicate, let existing = items.first(where: { $0.content == content }) {
+            if existing.isPinned { return }
+            items.removeAll { $0.content == content }
+        }
+        let index = items.firstIndex(where: { !$0.isPinned }) ?? items.endIndex
+        items.insert(ClipboardItem(content: content), at: index)
+        trimHistory()
+        saveHistory()
+    }
+
+    func togglePin(_ item: ClipboardItem) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        var updated = items.remove(at: index)
+        updated.isPinned.toggle()
+        let insertionIndex = updated.isPinned ? 0 : (items.firstIndex(where: { !$0.isPinned }) ?? items.endIndex)
+        items.insert(updated, at: insertionIndex)
+        trimHistory()
+        saveHistory()
+    }
+
+    func delete(_ item: ClipboardItem) {
+        items.removeAll { $0.id == item.id }
+        saveHistory()
+    }
+
+    func applyHistoryLimit() {
+        trimHistory()
+        saveHistory()
+    }
+
+    func removeDuplicates() {
+        var seen: [ClipboardContent] = []
+        items.removeAll { item in
+            if seen.contains(item.content) { return true }
+            seen.append(item.content)
+            return false
+        }
+        saveHistory()
+    }
+
+    private func trimHistory() {
+        var unpinnedCount = 0
+        items.removeAll { item in
+            guard !item.isPinned else { return false }
+            unpinnedCount += 1
+            return unpinnedCount > settings.historyLimit
+        }
+    }
+
+    func setPersistence(_ enabled: Bool) {
+        guard let store else {
+            errorMessage = "Clipboard history storage is unavailable."
+            return
+        }
+        do {
+            if enabled {
+                try store.save(items)
+            } else {
+                try store.delete()
+            }
+            settings.persistHistory = enabled
+            historyLoadFailed = false
+        } catch {
+            errorMessage = "Could not \(enabled ? "save" : "delete") clipboard history: \(error.localizedDescription)"
+        }
+    }
+
+    private func saveHistory() {
+        guard settings.persistHistory else { return }
+        guard !historyLoadFailed else {
+            errorMessage = "Clipboard history was not saved because the existing history could not be loaded."
+            return
+        }
+        do {
+            guard let store else {
+                errorMessage = "Clipboard history storage is unavailable."
+                return
+            }
+            try store.save(items)
+        } catch {
+            errorMessage = "Could not save clipboard history: \(error.localizedDescription)"
         }
     }
 
